@@ -155,6 +155,89 @@ bool isCC1pip_MINERvA_2017(FitEvent *event, double EnuMin, double EnuMax) {
   return true;
 };
 
+bool isNukeCC1pip_MINERvA(FitEvent *event, double EnuMin, double EnuMax) {
+
+  if (!isCCINC(event, 14, EnuMin, EnuMax))
+    return false;
+
+  // Allow pi+
+  int piPDG[] = {211};
+  int nLeptons = event->NumFSLeptons();
+
+  int nPip = event->NumFSParticle(211);
+
+  // Count particles
+  int genie_n_photons = 0;
+  int genie_n_mesons = 0;
+  for (unsigned int i = 0; i < event->NParticles(); ++i) {
+    FitParticle *p = event->GetParticle(i);
+    if (p->Status() != kFinalState)
+      continue;
+    int pdg = p->fPID;
+    double energy = p->fP.E();
+    if (pdg == 22 && energy > 10.0) {
+      genie_n_photons++;
+    }
+    else if (abs(pdg) == 211 || //pi+-
+             pdg == 111 ||  // pi0
+             abs(pdg) == 321 || // K-
+             abs(pdg) == 323 || // K*+-
+             pdg == 130 || // KL0
+             pdg == 310 || // KS0
+             pdg == 311 || // K0
+             pdg == 313 || // K*0
+             abs(pdg) == 221 || // eta
+             abs(pdg) == 331 // eta' (958)
+             ) {
+      genie_n_mesons++;
+    }
+
+  }
+
+  // Check that the desired pion exists and is the only meson
+  if (nPip != 1 || genie_n_mesons!= 1)
+    return false;
+  if (genie_n_photons != 0 )
+    return false;
+
+  // Check that there is only one final state lepton
+  if (nLeptons != 1)
+    return false;
+
+  TLorentzVector Pnu = event->GetHMISParticle(14)->fP;
+  TLorentzVector Pmu = event->GetHMFSParticle(13)->fP;
+  TLorentzVector Ppip = event->GetHMFSParticle(PhysConst::pdg_charged_pions)->fP;
+
+  // 1.5 < pmu < 20 GeV/c
+  double pmu = Pmu.Vect().Mag()/1.E3; // GeV
+  if( pmu < 1.5 ) return false;
+  if( pmu > 20. ) return false;
+
+  // thmu<13degree
+  double th_nu_mu = FitUtils::th(Pmu, Pnu) * 180. / M_PI;
+  if (th_nu_mu >= 13.) return false;
+
+  // 35 < Tpi < 350 MeV
+  double Tpi = (Ppip.E() - Ppip.Mag()); // MeV
+  if( Tpi < 35. ) return false;
+  if( Tpi > 350. ) return false;
+
+  // Extract Hadronic Mass
+  // The factor of 1000 is necessary for downstream functions
+  float m_n = (float)PhysConst::mass_proton * 1000.;
+  // q
+  float Q2_true = -1 * (Pmu - Pnu).Mag2();
+  // Ehad
+  float Enu_true = Pnu.E();
+  float ELep = Pmu.E();
+  float E_had = Enu_true - ELep;
+  // W_exp
+  float W_exp = sqrt( -Q2_true + 2 * m_n * (Enu_true - ELep) + m_n * m_n );
+  if (W_exp > 1400.) return false;
+
+  return true;
+};
+
 // *********************************
 // MINERvA CCNpi+/- signal definition from 2016 publication
 // Different to CC1pi+/- listed above; additional has W < 1.8 GeV
@@ -380,6 +463,9 @@ bool isCC0pi_MINERvAPTPZ(FitEvent *event, int nuPDG, double emin, double emax) {
     int pdg = p->fPID;
     double energy = p->fP.E();
 
+    // Any wrong sign muon is bad news
+    if (pdg == -13) return false;
+
     if (pdg == 13) {
       genie_n_muons++;
     } else if (pdg == 22 && energy > 10.0) {
@@ -419,14 +505,12 @@ bool isCC0pi_anti_MINERvAPTPZ(FitEvent *event, int nuPDG, double emin,
   // **************************************************
 
   // Check it's CCINC
-  if (!SignalDef::isCCINC(event, nuPDG, emin, emax))
-    return false;
+  if (!SignalDef::isCCINC(event, nuPDG, emin, emax)) return false;
   TLorentzVector pnu = event->GetNeutrinoIn()->fP;
   TLorentzVector pmu = event->GetHMFSParticle(-13)->fP;
   // Make Angle Cut > 20.0
   double th_nu_mu = FitUtils::th(pmu, pnu) * 180. / M_PI;
-  if (th_nu_mu >= 20.0)
-    return false;
+  if (th_nu_mu >= 20.0) return false;
 
   // Heidi Schellman (schellmh@science.oregonstate.edu) assured me that the p_t
   // and p_z (or p_||) cuts aren't actually implemented as a signal definition:
@@ -446,8 +530,7 @@ bool isCC0pi_anti_MINERvAPTPZ(FitEvent *event, int nuPDG, double emin,
   */
 
   // Find if there are any protons above 120 MeV kinetic energy
-  if (HasProtonKEAboveThreshold(event, 120.0))
-    return false;
+  if (HasProtonKEAboveThreshold(event, 120.0)) return false;
 
   // Particle counters
   int genie_n_muons = 0;
@@ -463,8 +546,11 @@ bool isCC0pi_anti_MINERvAPTPZ(FitEvent *event, int nuPDG, double emin,
     int pdg = p->fPID;
     double energy = p->fP.E();
 
+    // Any wrong sign muon is bad
+    if (pdg == 13) return false;
+
     // Any charged muons
-    if (abs(pdg) == 13) {
+    if (pdg == -13) {
       genie_n_muons++;
       // De-excitation photons
     } else if (pdg == 22 && energy > 10.0) {
@@ -484,9 +570,125 @@ bool isCC0pi_anti_MINERvAPTPZ(FitEvent *event, int nuPDG, double emin,
   }
 
   // Look for one muon with no mesons, heavy baryons or deexcitation photons
-  if (genie_n_muons == 1 && genie_n_mesons == 0 &&
-      genie_n_heavy_baryons_plus_pi0s == 0 && genie_n_photons == 0)
+  if (genie_n_muons == 1 && 
+      genie_n_mesons == 0 &&
+      genie_n_heavy_baryons_plus_pi0s == 0 && 
+      genie_n_photons == 0) {
     return true;
+  }
+
+  return false;
+}
+
+bool isCC0pi_anti_MINERvAPTPZ_ME_H(FitEvent *event, int nuPDG, double emin, double emax) {
+  // First check the target
+  // Coherent events on carbon will not be bound, so check the target PDG and the fBound
+  if (event->fBound != 0) return false;
+  if (event->fTargetPDG != 1000010010) return false;
+
+  // Check it's CCINC
+  if (!SignalDef::isCCINC(event, nuPDG, emin, emax)) return false;
+
+  // Then check there is only a neutron and mu+ in final state
+  if (event->NParticles() != 4) return false;
+
+  int nMuons = 0;
+  int nNeutrons = 0;
+  for (unsigned int i = 0; i < event->NParticles(); ++i) {
+    FitParticle *p = event->GetParticle(i);
+    int pdg = p->fPID;
+    if (p->Status() != kFinalState) continue;
+    if (pdg == -13) nMuons++;
+    else if (pdg == 2112) nNeutrons++;
+    else return false; // Exit if we find anything else
+  }
+
+  if (nMuons != 1 || nNeutrons < 1) return false; // Check for one muon and one neutron
+
+  TLorentzVector pnu = event->GetNeutrinoIn()->fP;
+  TLorentzVector pmu = event->GetHMFSParticle(-13)->fP;
+  // Make Angle Cut > 20.0 and muon momentum
+  double th_nu_mu = FitUtils::th(pmu, pnu) * 180. / M_PI;
+  if (th_nu_mu >= 20.0) return false;
+  if (pmu.Vect().Mag()/1.E3 < 1.5 || pmu.Vect().Mag()/1.E3 > 20) return false;
+
+  return true;
+}
+
+// **************************************************
+// Upcoming MINERvA ME CC0pi numubar RHC has slighly different signal definition to previous LE result
+bool isCC0pi_anti_MINERvAPTPZ_ME(FitEvent *event, int nuPDG, double emin,
+                              double emax) {
+  // **************************************************
+
+  // Check it's CCINC
+  if (!SignalDef::isCCINC(event, nuPDG, emin, emax)) return false;
+
+  TLorentzVector pnu = event->GetNeutrinoIn()->fP;
+  TLorentzVector pmu = event->GetHMFSParticle(-13)->fP;
+
+  // Make Angle Cut > 20.0
+  double th_nu_mu = FitUtils::th(pmu, pnu) * 180. / M_PI;
+  if (th_nu_mu >= 20.0) return false;
+
+  // Heidi Schellman (schellmh@science.oregonstate.edu) assured me that the p_t
+  // and p_z (or p_||) cuts aren't actually implemented as a signal definition:
+  // they're only implemented in the binning for p_t and p_z (but not Q2QE and
+  // EnuQE)
+  /*
+  // Cut on pT and pZ
+  Double_t px = pmu.X()/1.E3;
+  Double_t py = pmu.Y()/1.E3;
+  Double_t pt = sqrt(px*px+py*py);
+
+  // Don't want to assume the event generators all have neutrino coming along z
+  // pz is muon momentum projected onto the neutrino direction
+  Double_t pz = pmu.Vect().Dot(pnu.Vect()*(1.0/pnu.Vect().Mag()))/1.E3;
+  if (pz > 15 || pz < 1.5) return false;
+  if (pt > 1.5) return false;
+  */
+
+  // Find if there are any protons above 120 MeV kinetic energy
+  if (HasProtonKEAboveThreshold(event, 120.0)) return false;
+
+  // Particle counters
+  int genie_n_muons = 0;
+  int genie_n_mesons = 0;
+  int genie_n_photons = 0;
+
+  // Loop over the particles in the event and count them up
+  for (unsigned int i = 0; i < event->NParticles(); ++i) {
+    FitParticle *p = event->GetParticle(i);
+    if (p->Status() != kFinalState)
+      continue;
+
+    int pdg = p->fPID;
+    double energy = p->fP.E();
+
+    // Any wrong sign muon is bad
+    if (pdg == 13) return false;
+
+    // Any charged muons
+    if (pdg == -13) {
+      genie_n_muons++;
+      // De-excitation photons
+    } else if (pdg == 22 && energy > 10.0) {
+      genie_n_photons++;
+      // Mesons
+    } else if (abs(pdg) == 211 || abs(pdg) == 321 || abs(pdg) == 323 ||
+               pdg == 111 || pdg == 130 || pdg == 310 || pdg == 311 ||
+               pdg == 313 || abs(pdg) == 221 || abs(pdg) == 331 || abs(pdg) == 111) {
+      genie_n_mesons++;
+    }
+  }
+
+  // Look for one muon with no mesons, heavy baryons or deexcitation photons
+  if (genie_n_muons == 1 && 
+      genie_n_mesons == 0 &&
+      genie_n_photons == 0) {
+    return true;
+  }
+
   return false;
 }
 
@@ -671,5 +873,57 @@ bool isNukeCC0piNp_MINERvA_STV(FitEvent *event, double EnuMin, double EnuMax) {
   return true;
 }
 
+// Signal definition for MINERvA CCNpi0Mp STV
+bool isCCNpi0Mp_MINERvA_STV(FitEvent *event) {
+
+  // 1 muon
+  // At least 1 proton
+  // At least 1 pi0
+  // Highest momentum proton needs to be above 0.45 GeV/c
+  // Muon needs to be between 1.5 and 20 GeV/c, and thetamu < 25 degrees
+  // No cuts on pi0
+  // There is no upper limit on the momentum cuts for protons
+  // Variables are constructed using the highest momentum particles
+  // D. Coplowe's (Oxford) thesis says 1.5 < Emu < 20 (https://lss.fnal.gov/archive/thesis/2000/fermilab-thesis-2018-38.pdf)
+
+  // Somewhat custom signal definition, so can't use existing ones
+  // Check number of pi0
+  int nPi0 = event->NumFSParticle(111);
+  if (nPi0 == 0) return false;
+  //if (nPi0 != 1) return false;
+  // All mesons must be pi0
+  int nMesons = event->NumFSMesons();
+  if (nMesons != nPi0) return false;
+
+  // Check protons
+  std::vector<FitParticle*> protons = event->GetAllFSProton();
+  if (protons.size() == 0) return false;
+
+  // Check leptons
+  int nLeptons = event->NumFSLeptons();
+  if (nLeptons != 1) return false;
+  // Check the lepton is a muon
+  int nMu = event->NumFSParticle(13);
+  if (nMu != 1) return false;
+
+  // Get the neutrino to do the direction, and check the PDG code
+  FitParticle* Nu = event->GetNeutrinoIn();
+  if (Nu->PDG() != 14) return false;
+
+  TLorentzVector Pmu = event->GetHMFSParticle(13)->fP;
+  // 1.5 to 20 GeV/c cut on muon
+  // 25 degree cut relative neutrino direction
+  if (Pmu.Vect().Mag() < 1500  ||
+      Pmu.Vect().Mag() > 20000 ||
+      Pmu.Vect().Angle(Nu->fP.Vect())*180./M_PI > 25) {
+    return false;
+  }
+
+  TLorentzVector Pp = event->GetHMFSParticle(2212)->fP;
+  // 450 MeV/c cut on proton
+  if (Pp.Vect().Mag() < 450) return false;
+
+  return true;
+}
 
 } // namespace SignalDef

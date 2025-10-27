@@ -674,7 +674,7 @@ double ParamPull::GetLikelihood() {
 
   // Gaussian Calculation with correlations
   case kGausPull:
-    like = StatUtils::GetChi2FromCov(fDataHist, fMCHist, fInvCovar, NULL);
+    like = StatUtils::GetChi2FromCov(fDataHist, fMCHist, fInvCovar, NULL, 1., 1E76, NULL, false);
     like *= 1E-76;
     break;
 
@@ -844,6 +844,7 @@ TH2D ParamPull::GetDecompCovar() {
 void ParamPull::Write(std::string writeoptt) {
   //*******************************************************************************
 
+  (void)writeoptt;
   fDataHist->Write();
   fMCHist->Write();
   if (fLimitHist) {

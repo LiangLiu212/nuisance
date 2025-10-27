@@ -59,6 +59,7 @@ namespace SignalDef {
   bool isCC1pip_MINERvA(FitEvent *event, double EnuMin, double EnuMax,
       bool isRestricted = false);
   bool isCC1pip_MINERvA_2017(FitEvent *event, double EnuMin, double EnuMax);
+  bool isNukeCC1pip_MINERvA(FitEvent *event, double EnuMin, double EnuMax);
 
   // *********************************
   /// MINERvA CCNpi+/- signal definition from 2016 publication
@@ -120,9 +121,13 @@ namespace SignalDef {
 
   bool isCC0pi_MINERvAPTPZ(FitEvent *event, int nuPDG, double EnuMin = 0, double EnuMax = 0);
   bool isCC0pi_anti_MINERvAPTPZ(FitEvent* event, int nuPDG, double EnuMin = 0, double EnuMax = 0);
+  bool isCC0pi_anti_MINERvAPTPZ_ME(FitEvent* event, int nuPDG, double EnuMin = 0, double EnuMax = 0);
+  bool isCC0pi_anti_MINERvAPTPZ_ME_H(FitEvent *event, int nuPDG, double emin = 0, double emax = 0);
   
   bool isNukeCC0pi_MINERvAPTPZ(FitEvent *event, double EnuMin, double EnuMax);
   bool isNukeCC0piNp_MINERvA_STV(FitEvent *event, double EnuMin, double EnuMax);
+
+  bool isCCNpi0Mp_MINERvA_STV(FitEvent *event);
 
 }
 

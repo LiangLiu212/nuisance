@@ -18,6 +18,10 @@
  *******************************************************************************/
 #include "Measurement1D.h"
 
+#ifdef NuHepMC_ENABLED
+#include "NuHepMCInputHandler.h"
+#endif
+
 //********************************************************************
 Measurement1D::Measurement1D(void) {
   //********************************************************************
@@ -473,7 +477,9 @@ void Measurement1D::SetCholDecompFromRootFile(std::string covfile,
   delete trans;
 }
 
+//********************************************************************
 void Measurement1D::SetShapeCovar() {
+//********************************************************************
 
   // Return if this is missing any pre-requisites
   if (!fFullCovar)
@@ -481,7 +487,7 @@ void Measurement1D::SetShapeCovar() {
   if (!fDataHist)
     return;
 
-  // Also return if it's bloody stupid under the circumstances
+  // Also return if just have a diagonal matrix (basically, no covariance)
   if (fIsDiag)
     return;
 
@@ -602,17 +608,16 @@ void Measurement1D::FinaliseMeasurement() {
     fDecomp = StatUtils::GetDecomp(fFullCovar);
   }
 
-  // Push the diagonals of fFullCovar onto the data histogram
-  // Comment this out until the covariance/data scaling is consistent!
+  // Push the diagonals of fFullCovar onto the data histogram, and check that they are consisntent
+  // This is a useful check for inconsistent data releases, or inconsistent covariance matrix units, or simply wrong data releases...
+  // Assumes that the covariance matrix should be scaled by 1E-38
   StatUtils::SetDataErrorFromCov(fDataHist, fFullCovar, 1E-38);
 
   // If shape only, set covar and fDecomp using the shape-only matrix (if set)
   if (fIsShape && fShapeCovar && FitPar::Config().GetParB("UseShapeCovar")) {
-    if (covar)
-      delete covar;
+    if (covar) delete covar;
     covar = StatUtils::GetInvert(fShapeCovar, true);
-    if (fDecomp)
-      delete fDecomp;
+    if (fDecomp) delete fDecomp;
     fDecomp = StatUtils::GetDecomp(fFullCovar);
 
     fUseShapeNormDecomp = FitPar::Config().GetParB("UseShapeNormDecomp");
@@ -625,15 +630,13 @@ void Measurement1D::FinaliseMeasurement() {
           fNormError += (*fFullCovar)[i][j];
         }
       }
-
       NUIS_LOG(SAM, "Sample: " << fName
                                << ", using shape/norm decomp with norm error: "
                                << fNormError);
     }
-
   }
 
-  // ***** NS covar modifications *****
+  // ***** norm-shape (NS) covariance modifications *****
 
   fIsNS = FitPar::Config().GetParB("UseNormShapeCovariance");
 
@@ -677,8 +680,21 @@ void Measurement1D::FinaliseMeasurement() {
   // Search drawopts for possible types to include by default
   std::string drawopts = FitPar::Config().GetParS("drawopts");
   if (drawopts.find("MODES") != std::string::npos) {
-    fMCHist_Modes = new TrueModeStack((fSettings.GetName() + "_MODES").c_str(),
-				      ("True Channels"), fMCHist);
+
+#ifdef NuHepMC_ENABLED
+    auto nuhepmc_inputhandler = dynamic_cast<NuHepMCInputHandler *>(fInput);
+    if (nuhepmc_inputhandler) {
+      fMCHist_Modes = new TrueModeStack(
+          (fSettings.GetName() + "_MODES").c_str(), ("True Channels"), fMCHist,
+          nuhepmc_inputhandler->fprocids);
+    } else {
+#endif
+      fMCHist_Modes = new TrueModeStack(
+          (fSettings.GetName() + "_MODES").c_str(), ("True Channels"), fMCHist);
+#ifdef NuHepMC_ENABLED
+    }
+#endif
+
     fMCHist_Modes ->SetTitleX(fDataHist->GetXaxis()->GetTitle());
     fMCHist_Modes ->SetTitleY(fDataHist->GetYaxis()->GetTitle());
 
@@ -702,6 +718,10 @@ void Measurement1D::FinaliseMeasurement() {
     NUIS_LOG(SAM, "Loaded mask histogram: " << fSettings.GetS("maskhist")
                                             << " from "
                                             << fSettings.GetS("maskfile"));
+
+    // Apply masking by setting masked data bins to zero
+    PlotUtils::MaskBins(fDataHist, fMaskHist);
+
   } else if (fIsMask) { // Setup bin masks using sample name
 
     std::string curname = fName;
@@ -1658,6 +1678,8 @@ void Measurement1D::SetupMeasurement(std::string inputfile, std::string type,
                                      FitWeight *rw, std::string fkdt) {
   //********************************************************************
 
+  (void)fkdt;
+
   nuiskey samplekey = Config::CreateKey("sample");
   samplekey.Set("name", fName);
   samplekey.Set("type", type);
@@ -1747,8 +1769,20 @@ void Measurement1D::SetupDefaultHist() {
     SetBinMask(maskloc);
   }
 
-  fMCHist_Modes =
-      new TrueModeStack((fName + "_MODES").c_str(), ("True Channels"), fMCHist);
+#ifdef NuHepMC_ENABLED
+    auto nuhepmc_inputhandler = dynamic_cast<NuHepMCInputHandler *>(fInput);
+    if (nuhepmc_inputhandler) {
+      fMCHist_Modes = new TrueModeStack(
+          (fName + "_MODES").c_str(), ("True Channels"), fMCHist,
+          nuhepmc_inputhandler->fprocids);
+    } else {
+#endif
+      fMCHist_Modes = new TrueModeStack(
+          (fName + "_MODES").c_str(), ("True Channels"), fMCHist);
+#ifdef NuHepMC_ENABLED
+    }
+#endif
+
   SetAutoProcessTH1(fMCHist_Modes, kCMD_Reset, kCMD_Norm, kCMD_Write);
 
   fMCFine_Modes =
@@ -2020,8 +2054,6 @@ void Measurement1D::SetCovarFromDataFile(std::string covarFile,
   TDecompChol LUChol = TDecompChol(*fDecomp);
   LUChol.Decompose();
   fDecomp = new TMatrixDSym(dim, LU.GetU().GetMatrixArray(), "");
-
-  return;
 };
 
 // //********************************************************************
