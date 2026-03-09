@@ -55,6 +55,10 @@ std::vector<FitParticle*> GetCC1Mu1pProtonsInPS(FitEvent* event);
  */
 bool isNCpi0(FitEvent* event);
 
+// CC 1mu Np from Steven Gardiner
+bool isCC1MuNpFor2DAnalysis( FitEvent* event, double EnuMin, double EnuMax );
+bool isMesonOrAntimeson( int pdg_code );
+
   }  // namespace MicroBooNE
 }  // namespace SignalDef
 

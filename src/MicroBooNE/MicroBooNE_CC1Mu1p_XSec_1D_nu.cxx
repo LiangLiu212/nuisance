@@ -156,6 +156,7 @@ void MicroBooNE_CC1Mu1p_XSec_1D_nu::FillEventVariables(FitEvent *event) {
 
   // using definitions in
   // https://journals.aps.org/prd/pdf/10.1103/PhysRevD.108.053002
+  
 
   TVector3 vp = signal_proton.P3();
   TVector3 vSum =
@@ -303,6 +304,8 @@ void MicroBooNE_CC1Mu1p_XSec_1D_nu::ConvertEventRates() {
   for (int i = 0; i < n; i++) {
     v(i) = fMCHist->GetBinContent(i + 1);
     e(i) = std::pow(fMCHist->GetBinError(i + 1), 2);
+
+    std::cout << "DEBUG: " << "v, e = " << v(i) << ", " << e(i) << std::endl;
   }
 
   TVectorD vs = (*fSmearingMatrix) * v;
@@ -311,6 +314,7 @@ void MicroBooNE_CC1Mu1p_XSec_1D_nu::ConvertEventRates() {
   for (int i = 0; i < n; i++) {
     fMCHist->SetBinContent(i + 1, vs(i));
     fMCHist->SetBinError(i + 1, std::sqrt(es(i)));
+    std::cout << "DEBUG: " << "v, e = " << vs(i) << ", " << es(i) << std::endl;
   }
 
   // have to do standard conversion AFTER wSVD smearing

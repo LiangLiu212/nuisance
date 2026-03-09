@@ -237,8 +237,8 @@ void MeasurementBase::Reconfigure() {
     Mode = cust_event->Mode;
 
     // Extract Measurement Variables
-    this->FillEventVariables(cust_event);
     Signal = this->isSignal(cust_event);
+    this->FillEventVariables(cust_event);
     if (Signal)
       npassed++;
 
@@ -309,8 +309,8 @@ MeasurementVariableBox *MeasurementBase::FillVariableBox(FitEvent *event) {
   Mode = event->Mode;
   Weight = 1.0; // event->Weight;
 
-  this->FillEventVariables(event);
   Signal = this->isSignal(event);
+  this->FillEventVariables(event);
 
   GetBox()->FillBoxFromEvent(event);
 

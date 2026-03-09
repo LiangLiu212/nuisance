@@ -354,6 +354,14 @@ void MicroBooNE_CC1Mu1p_XSec_2D_nu::FillMCSlice(double x, double y,
 
 void MicroBooNE_CC1Mu1p_XSec_2D_nu::ConvertEventRates() {
 
+
+  for (size_t i = 0; i < fMCHist_Slices.size(); i++) {
+    TH1D *h = (TH1D *)fMCHist_Slices[i]->Clone(TString(fMCHist_Slices[i]->GetName()) + "_true");
+    for(int j = 1; j < h->GetNbinsX() + 1; j++){
+      std::cout << "DEBUG: " << __FILE__ << ":" << __LINE__ << "  " << h->GetBinContent(j) << std::endl;
+    }
+  }
+
   // Do standard conversion
   Measurement1D::ConvertEventRates();
 
@@ -391,6 +399,7 @@ void MicroBooNE_CC1Mu1p_XSec_2D_nu::ConvertEventRates() {
   for (size_t i = 0; i < fMCHist_Slices.size(); i++) {
     std::pair<double, double> edges = slices[i].GetSliceEdges();
     float w = edges.second - edges.first;
+      std::cout << "DEBUG: " << __FILE__ << ":" << __LINE__ << "  " << w << std::endl;
     fMCHist_Slices[i]->Scale(1.0 / w);
   }
 
@@ -399,6 +408,7 @@ void MicroBooNE_CC1Mu1p_XSec_2D_nu::ConvertEventRates() {
   int bincount = 0;
   for (size_t i = 0; i < fDataHist_Slices.size(); i++) {
     for (int j = 0; j < fDataHist_Slices[i]->GetNbinsX(); j++) {
+      std::cout << "DEBUG: " << __FILE__ << ":" << __LINE__ << "  " << fMCHist_Slices[i]->GetBinContent(j + 1) << std::endl;
       fMCHist->SetBinContent(bincount + 1, fMCHist_Slices[i]->GetBinContent(j + 1));
       fMCHist->SetBinError(bincount + 1, fMCHist_Slices[i]->GetBinError(j + 1));
       bincount++;
